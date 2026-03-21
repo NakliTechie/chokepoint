@@ -8,8 +8,6 @@ A browser-based tower defense game set in the world's most contested maritime st
 
 ⭐ **Like it?** Give this repo a star!
 
-A companion game to **[Strait Command](https://github.com/NakliTechie/strait-command)** — same maps, different threat.
-
 ---
 
 ## Run Locally
@@ -80,13 +78,19 @@ Each map uses a real-world satellite basemap (Leaflet + CartoDB Voyager tiles) w
 
 ## Features
 
-- 🗺️ Real-world chokepoint maps — same geography as Strait Command
+- 🗺️ Real-world chokepoint maps — same geography as [Strait Command](https://github.com/NakliTechie/strait-command)
 - 🚢 4 enemy types with distinct HP, speed, and reward profiles
 - 🏗️ 3 tower types with range preview on placement
 - 💰 Gold economy — earn from kills, spend on towers, sell for half
 - ⏱️ 15-second build window between waves; click to send early
 - 📡 Map-specific geopolitical news ticker
 - 🌊 Wave difficulty scales automatically — no wave cap
+
+---
+
+## See Also
+
+**[Strait Command](https://github.com/NakliTechie/strait-command)** — same maps, different genre. A naval strategy game set in the same chokepoints.
 
 ---
 
