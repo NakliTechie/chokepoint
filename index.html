@@ -290,6 +290,7 @@ function initGame() {
     spawnTimer: 0,
     nextId: 0,
     nextWaveIn: -1,   // seconds until auto-start; -1 = not counting
+    pathFlash: 0,     // counts down after adaptive reroute; path pulses orange
   };
   computePath();
   updateHud();
@@ -311,6 +312,71 @@ const PATHS = {
 
 function computePath() {
   G.path = PATHS[document.getElementById('selMap').value] || [];
+}
+
+// Dijkstra with a pluggable per-cell cost function.
+// Linear-scan open set — fine for 35×19 = 665 cells.
+function dijkstraPath(mask, start, end, costFn) {
+  const INF = 1e9;
+  const dist = Array.from({length: ROWS}, () => new Float32Array(COLS).fill(INF));
+  const prev = Array.from({length: ROWS}, () => Array(COLS).fill(null));
+  dist[start[0]][start[1]] = 0;
+  const open = [[0, start[0], start[1]]];   // [cost, r, c]
+  const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
+
+  while (open.length) {
+    let mi = 0;
+    for (let i = 1; i < open.length; i++) if (open[i][0] < open[mi][0]) mi = i;
+    const [cc, r, c] = open.splice(mi, 1)[0];
+    if (r === end[0] && c === end[1]) break;
+    if (cc > dist[r][c]) continue;
+    for (const [dr, dc] of dirs) {
+      const nr = r + dr, nc = c + dc;
+      if (nr < 0 || nr >= ROWS || nc < 0 || nc >= COLS || mask[nr][nc]) continue;
+      const nc2 = cc + costFn(nr, nc);
+      if (nc2 < dist[nr][nc]) {
+        dist[nr][nc] = nc2;
+        prev[nr][nc] = [r, c];
+        open.push([nc2, nr, nc]);
+      }
+    }
+  }
+
+  if (dist[end[0]][end[1]] >= INF) return null;
+  const path = []; let cur = end;
+  while (cur) { path.unshift(cur); cur = prev[cur[0]][cur[1]]; }
+  return path;
+}
+
+// Builds a cost function where water cells near towers are expensive.
+// Enemies probe for gaps — heavily covered corridors become high-cost.
+function towerCostFn(mask, towers) {
+  const penalty = Array.from({length: ROWS}, () => new Float32Array(COLS));
+  for (const tw of towers) {
+    const w = TOWER_CFG[tw.type].range * 3;
+    for (let r = 0; r < ROWS; r++)
+      for (let c = 0; c < COLS; c++) {
+        if (mask[r][c]) continue;
+        const d2 = (r - tw.r) ** 2 + (c - tw.c) ** 2;
+        penalty[r][c] += w / (d2 + 0.5);
+      }
+  }
+  return (r, c) => 1 + penalty[r][c];
+}
+
+// Called after each wave clears. Re-routes around current tower layout.
+function recomputeAdaptivePath() {
+  if (!G.towers.length) return;
+  const m = curMap();
+  const newPath = dijkstraPath(m.mask, m.entry, m.exit, towerCostFn(m.mask, G.towers));
+  if (!newPath) return;  // keep current path if Dijkstra finds nothing
+
+  const changed = newPath.length !== G.path.length ||
+    newPath.some(([r, c], i) => G.path[i][0] !== r || G.path[i][1] !== c);
+  if (changed) {
+    G.path = newPath;
+    G.pathFlash = 3.0;
+  }
 }
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
@@ -399,6 +465,7 @@ function gameLoop(ts) {
   if (tickTimer > 4.2) { tickTimer = 0; updateTicker(); }
 
   if (!G.over) {
+    if (G.pathFlash > 0) G.pathFlash = Math.max(0, G.pathFlash - dt);
     if (G.nextWaveIn > 0) {
       G.nextWaveIn -= dt;
       const secs = Math.ceil(G.nextWaveIn);
@@ -509,7 +576,9 @@ function checkWaveComplete() {
   G.gold += bonus;
   G.score += bonus * 5;
   updateHud();
-  setStatus(`✅ WAVE ${G.wave} CLEARED — +$${bonus} BONUS · NEXT WAVE IN 15s`);
+  recomputeAdaptivePath();
+  const rerouteMsg = G.pathFlash > 0 ? ' · ⚠️ ENEMY SHIPS REROUTING' : '';
+  setStatus(`✅ WAVE ${G.wave} CLEARED — +$${bonus} BONUS · NEXT WAVE IN 15s${rerouteMsg}`);
   G.nextWaveIn = 15;
   document.getElementById('btnWave').disabled = false;
 }
@@ -541,8 +610,13 @@ function draw() {
     }
   }
 
-  // Path highlight
-  ctx.fillStyle = 'rgba(30,120,255,0.07)';
+  // Path highlight — pulses orange when enemies have just rerouted
+  if (G.pathFlash > 0) {
+    const pulse = 0.4 + 0.35 * Math.sin(G.pathFlash * 10);
+    ctx.fillStyle = `rgba(255,160,0,${pulse})`;
+  } else {
+    ctx.fillStyle = 'rgba(30,120,255,0.07)';
+  }
   for (const [r, c] of G.path) ctx.fillRect(c * CW, r * CH, CW, CH);
 
   // Entry marker (green)
