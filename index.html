@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>⚓ CHOKEPOINT</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#dce8f0;color:#1a2a3a;font-family:'Courier New',monospace;display:flex;flex-direction:column;align-items:center;padding:12px;min-height:100vh}
+h1{color:#0d3b6e;font-size:1.55rem;letter-spacing:4px;margin-bottom:3px}
+.sub{font-size:.68rem;color:#5a7a9a;letter-spacing:2px;margin-bottom:10px}
+#hud{display:flex;gap:20px;background:#fff;border:2px solid #b0c8dc;padding:8px 20px;margin-bottom:8px;align-items:center;box-shadow:0 2px 6px rgba(0,50,100,.1);flex-wrap:wrap}
+.hb{text-align:center}
+.hl{font-size:.58rem;color:#7a9ab0;letter-spacing:1px;display:block;text-transform:uppercase}
+.hv{font-size:1.25rem;color:#0d3b6e;font-weight:bold;min-width:58px;display:block}
+.hv.ok{color:#1a7a1a}.hv.bad{color:#c0200a}
+#ctrl-map{display:flex;gap:6px;margin-bottom:5px;align-items:center;max-width:880px}
+#ctrl-build{display:flex;gap:6px;margin-bottom:8px;align-items:center;flex-wrap:wrap;max-width:880px}
+.tb{background:#fff;border:2px solid #b0c8dc;color:#0d3b6e;padding:4px 9px;font-family:'Courier New',monospace;font-size:.7rem;cursor:pointer;letter-spacing:1px;transition:all .15s;text-align:left;line-height:1.4}
+.tb:hover{background:#e0edf7;border-color:#0d3b6e}
+.tb.sel{background:#0d3b6e;color:#fff;border-color:#0a2d56}
+.tb small{font-size:.55rem;color:#7a9ab0;display:block}.tb.sel small{color:#88b0d0}
+.sep{color:#b0c8dc;font-size:.8rem;padding:0 2px}
+select,button{background:#fff;border:2px solid #b0c8dc;color:#0d3b6e;padding:5px 10px;font-family:'Courier New',monospace;font-size:.72rem;cursor:pointer;letter-spacing:1px;transition:all .15s}
+button:hover{background:#e0edf7;border-color:#0d3b6e}
+button:disabled{opacity:.45;cursor:default}
+#btnWave{background:#1a7a1a;border-color:#155a15;color:#fff}
+#btnWave:hover:not(:disabled){background:#155a15}
+#btnWave:disabled{background:#888;border-color:#666}
+#wrap{position:relative;border:3px solid #0d3b6e;box-shadow:0 4px 18px rgba(0,50,100,.25)}
+#map{width:860px;height:460px}
+#gc{position:absolute;top:0;left:0;width:860px;height:460px;cursor:crosshair;z-index:1000}
+#ov{position:absolute;top:0;left:0;right:0;bottom:0;display:none;align-items:center;justify-content:center;background:rgba(240,248,255,.94);z-index:2000}
+#ov.show{display:flex}
+.mb{background:#fff;padding:28px 38px;text-align:center;max-width:440px;border:2px solid #b0c8dc;box-shadow:0 4px 16px rgba(0,50,100,.15)}
+.mb.win{border-color:#1a7a1a}.mb.lose{border-color:#c0200a}
+.mb h2{font-size:1.2rem;margin-bottom:10px;letter-spacing:2px;color:#0d3b6e}
+.mb.win h2{color:#1a7a1a}.mb.lose h2{color:#c0200a}
+.mb p{color:#4a6a80;font-size:.78rem;margin-bottom:6px;line-height:1.6}
+.mb .stat{color:#0d3b6e;font-size:.85rem;font-weight:bold;margin:10px 0 4px}
+#ticker{margin-top:8px;font-size:.62rem;color:#6a8a9a;letter-spacing:1px;max-width:860px;height:1.2em;overflow:hidden}
+#status-bar{font-size:.65rem;color:#5a7a9a;letter-spacing:1px;margin-bottom:4px;height:1em}
+.leaflet-control-attribution{font-size:9px!important}
+</style>
+</head>
+<body>
+
+<h1>⚓ CHOKEPOINT</h1>
+<p class="sub" id="mapSub">STRAIT DEFENSE · BUILD TOWERS ON LAND · STOP HOSTILE SHIPS</p>
+
+<div id="hud">
+  <div class="hb"><span class="hl">LIVES</span><span class="hv ok" id="hLives">20</span></div>
+  <div class="hb"><span class="hl">GOLD</span><span class="hv" id="hGold">$200</span></div>
+  <div class="hb"><span class="hl">WAVE</span><span class="hv" id="hWave">0</span></div>
+  <div class="hb"><span class="hl">SCORE</span><span class="hv" id="hScore">0</span></div>
+  <div class="hb"><span class="hl">KILLS</span><span class="hv" id="hKills">0</span></div>
+</div>
+
+<div id="ctrl-map">
+  <select id="selMap">
+    <option value="hormuz">🗺️ STRAIT OF HORMUZ</option>
+    <option value="bab">🗺️ BAB EL-MANDEB</option>
+    <option value="malacca">🗺️ MALACCA STRAIT</option>
+    <option value="taiwan">🗺️ TAIWAN STRAIT</option>
+  </select>
+  <button id="btnWave">▶ SEND WAVE 1</button>
+  <button id="btnNew">◼ NEW GAME</button>
+</div>
+<div id="ctrl-build">
+  <span class="sep">BUILD:</span>
+  <button class="tb" id="tb-watch"  data-type="watch">🛡️ WATCH POST<small>$50 · RNG 3 · 8dmg · fast</small></button>
+  <button class="tb" id="tb-gun"    data-type="gun">⚓ NAVAL GUN<small>$150 · RNG 5 · 25dmg · med</small></button>
+  <button class="tb" id="tb-missile" data-type="missile">🚀 MISSILE BATT.<small>$300 · RNG 7 · 80dmg · slow</small></button>
+  <button id="tb-cancel" style="display:none">✕ CANCEL</button>
+</div>
+<div id="status-bar">RIGHT-CLICK A TOWER TO SELL FOR 50% · BUILD ON LAND (BROWN) · ENEMIES TRAVEL THROUGH WATER</div>
+
+<div id="wrap">
+  <div id="map"></div>
+  <canvas id="gc" width="860" height="460"></canvas>
+  <div id="ov">
+    <div class="mb" id="msgbox">
+      <h2 id="msgTitle"></h2>
+      <p id="msgBody"></p>
+      <p class="stat" id="msgStat"></p>
+      <button id="btnOk" style="margin-top:14px">CONTINUE</button>
+    </div>
+  </div>
+</div>
+<div id="ticker">⚓ CHOKEPOINT — Awaiting deployment orders…</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+'use strict';
+
+// ── MAP DEFINITIONS ──────────────────────────────────────────────────────────
+// mask: 1=land (build here), 0=water (enemy path)
+// entry/exit: [row, col] where enemies spawn and where they escape
+
+const MAPS = {
+  hormuz: {
+    name: 'STRAIT OF HORMUZ',
+    subtitle: 'PERSIAN GULF CHOKE — IRGCN HOSTILE FLEET APPROACHING',
+    center: [26.4, 56.5], zoom: 8,
+    entry: [9, 0], exit: [17, 34],
+    mask: [
+      [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+      [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+      [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+      [1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+      [1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+      [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+      [1,1,1,1,1,1,1,1,0,1,0,1,1,1,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+      [0,0,1,1,1,1,1,0,1,1,1,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1],
+      [0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1],
+      [0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1],
+      [0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+    ],
+    ticker: [
+      "📡 IRGCN COMMAND — Hostile fleet sortied from Bandar Abbas",
+      "🛢️ Hormuz traffic: 17M barrels/day at risk",
+      "⚠️ Iranian fast-attack boats detected near shipping lane",
+      "📍 Tanker 'Nordic Star' under escort — request fire support",
+      "🔍 Radar contact: 12 vessels bearing 280° at 14 knots",
+      "📡 US 5th Fleet has entered the strait — coordinate fire",
+      "🛢️ Oil futures surge 8% — strait under siege",
+      "⚠️ Helo assets inbound — hold the line",
+    ]
+  },
+  bab: {
+    name: 'BAB EL-MANDEB STRAIT',
+    subtitle: 'RED SEA GATEWAY — HOUTHI FLEET PUSHING THROUGH',
+    center: [12.65, 43.35], zoom: 9,
+    entry: [0, 9], exit: [18, 25],
+    mask: [
+      [1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+      [1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+      [1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+      [1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+      [1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+      [1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+      [1,1,1,1,1,1,1,1,1,1,0,0,1,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+      [1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0],
+      [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,1,1,0,0,1,1,1,1,1,1,1,1,1,1,1,0],
+      [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,1,1,1,0,1,1,0,0,0],
+      [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+    ],
+    ticker: [
+      "📡 HOUTHI NAVAL COMMAND — Missile boats flooding the channel",
+      "🛢️ Red Sea: 4.8M barrels/day rerouted via Cape of Good Hope",
+      "⚠️ Djibouti base on full alert — fire at will",
+      "📍 Saudi tanker convoy requesting emergency air cover",
+      "🔍 Fast boats detected on infrared — multiple contacts",
+      "📡 Egyptian Navy closing southern approach — hold position",
+      "🛢️ Suez Canal authority declares crisis — act now",
+      "⚠️ Houthi reinforcements spotted — waves incoming",
+    ]
+  },
+  malacca: {
+    name: 'MALACCA STRAIT',
+    subtitle: 'SINGAPORE STRAIT — PIRATE ARMADA CLOSING IN',
+    center: [2.5, 101.5], zoom: 8,
+    entry: [0, 6], exit: [18, 27],
+    mask: [
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0],
+      [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0],
+      [1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0],
+      [1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0],
+      [1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0],
+      [1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0],
+      [1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0],
+      [1,1,1,1,1,1,0,1,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0],
+      [1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+      [1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+      [1,1,1,1,1,1,1,1,1,1,0,0,1,1,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1],
+      [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,1,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1],
+      [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1,1,1,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1],
+      [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1,1,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1],
+      [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1],
+      [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1,1,0,0,0,0,0,0,0,0,1,1,1,1],
+      [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,1,1,0,0,0,0,0,0,0,1,1,1],
+      [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1,1,0,0,0,0,0,0,0,0,1,1],
+    ],
+    ticker: [
+      "📡 MALACCA PATROL — Pirate armada detected on AIS spoofing",
+      "🛢️ Strait traffic: 25% of world trade in jeopardy",
+      "⚠️ Singapore naval base scrambled — all towers active",
+      "📍 Maersk convoy requests protective fire corridor",
+      "🔍 30+ fast boats, poorly armed but overwhelming",
+      "📡 Indonesian maritime patrol heading northwest",
+      "🛢️ Lloyd's suspends insurance — this is war",
+      "⚠️ Pirate mothership spotted — priority target",
+    ]
+  },
+  taiwan: {
+    name: 'TAIWAN STRAIT',
+    subtitle: 'CROSS-STRAIT CRISIS — PLA FLEET FORCING THE PASSAGE',
+    center: [24.3, 119.4], zoom: 8,
+    entry: [18, 12], exit: [0, 25],
+    mask: [
+      [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+      [1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0],
+      [1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1],
+      [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1],
+      [1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1],
+      [1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1],
+      [1,1,1,1,1,1,1,1,0,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1],
+      [1,1,1,1,1,1,1,0,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1],
+      [1,1,1,1,1,1,1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1],
+      [1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1],
+      [1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,1,1,1,1,1,1,1,0],
+      [1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,0],
+      [1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,0],
+      [1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,0],
+      [1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,0,0],
+      [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,1,1,1,1,1,1,1,1,1,0,0],
+      [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,0,0],
+      [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,0,0,0],
+    ],
+    ticker: [
+      "📡 PLA EASTERN THEATER — Carrier groups transiting south",
+      "🛢️ Taiwan Strait: semiconductor lifeline at stake",
+      "⚠️ US Seventh Fleet converging — coordinates uploaded",
+      "📍 ROC Navy requesting immediate fire support",
+      "🔍 Submerged contacts — PLA submarines in formation",
+      "📡 Japan MSDF mobilized — hold every chokepoint",
+      "🛢️ TSMC halting production — strait must be held",
+      "⚠️ PLA amphibious assault ships in convoy — priority kill",
+    ]
+  }
+};
+
+// ── CONSTANTS ─────────────────────────────────────────────────────────────────
+const MW = 860, MH = 460, COLS = 35, ROWS = 19;
+const CW = MW / COLS, CH = MH / ROWS;
+
+const TOWER_CFG = {
+  watch:   { cost:50,  sell:25,  range:3, dmg:8,  rate:1.5, col:'#1a5ab0', emoji:'🛡️', label:'WATCH POST'  },
+  gun:     { cost:150, sell:75,  range:5, dmg:25, rate:0.8, col:'#0d3b6e', emoji:'⚓',  label:'NAVAL GUN'   },
+  missile: { cost:300, sell:150, range:7, dmg:80, rate:0.3, col:'#1a2a4a', emoji:'🚀', label:'MISSILE BATT' },
+};
+
+const ENEMY_CFG = {
+  patrol:  { hp:50,  spd:1.8, reward:10, col:'#2a8a2a', emoji:'🚤', label:'PATROL BOAT' },
+  cargo:   { hp:150, spd:1.1, reward:18, col:'#2a5a8a', emoji:'🚢', label:'CARGO SHIP'  },
+  tanker:  { hp:400, spd:0.6, reward:30, col:'#8a5a2a', emoji:'🛢️', label:'TANKER'       },
+  destroyer:{ hp:250, spd:1.6, reward:25, col:'#aa2222', emoji:'⚔️', label:'DESTROYER'  },
+};
+
+// ── GAME STATE ────────────────────────────────────────────────────────────────
+let G = {}, leafMap = null, lastTs = 0, rafId = null, tickIdx = 0, tickTimer = 0;
+const canvas = document.getElementById('gc');
+const ctx = canvas.getContext('2d');
+
+function initGame() {
+  G = {
+    lives: 20,
+    gold: 200,
+    score: 0,
+    wave: 0,
+    kills: 0,
+    towers: [],
+    enemies: [],
+    projectiles: [],
+    path: [],
+    placing: null,
+    hoverCell: null,
+    over: false,
+    waveActive: false,
+    spawnQueue: [],
+    spawnTimer: 0,
+    nextId: 0,
+    nextWaveIn: -1,   // seconds until auto-start; -1 = not counting
+  };
+  computePath();
+  updateHud();
+  document.getElementById('ov').classList.remove('show');
+  G.nextWaveIn = -1;
+  document.getElementById('btnWave').textContent = '▶ SEND WAVE 1';
+  document.getElementById('btnWave').disabled = false;
+  setStatus('BUILD YOUR DEFENSES — SEND WAVE WHEN READY');
+  updateTicker();
+}
+
+// ── PATHS (hardcoded — computed via BFS offline) ──────────────────────────────
+const PATHS = {
+  hormuz: [[9,0],[9,1],[9,2],[9,3],[9,4],[9,5],[9,6],[9,7],[9,8],[9,9],[9,10],[9,11],[9,12],[9,13],[9,14],[9,15],[9,16],[9,17],[10,17],[11,17],[12,17],[13,17],[14,17],[15,17],[16,17],[17,17],[17,18],[17,19],[17,20],[17,21],[17,22],[17,23],[17,24],[17,25],[17,26],[17,27],[17,28],[17,29],[17,30],[17,31],[17,32],[17,33],[17,34]],
+  bab:    [[0,9],[1,9],[2,9],[3,9],[4,9],[5,9],[5,10],[5,11],[5,12],[5,13],[6,13],[6,14],[7,14],[7,15],[8,15],[9,15],[10,15],[10,16],[11,16],[11,17],[12,17],[13,17],[13,18],[14,18],[15,18],[16,18],[17,18],[18,18],[18,19],[18,20],[18,21],[18,22],[18,23],[18,24],[18,25]],
+  malacca:[[0,6],[1,6],[2,6],[3,6],[4,6],[5,6],[6,6],[7,6],[7,7],[7,8],[8,8],[8,9],[9,9],[10,9],[10,10],[10,11],[10,12],[10,13],[10,14],[11,14],[11,15],[11,16],[11,17],[11,18],[11,19],[12,19],[12,20],[13,20],[14,20],[15,20],[15,21],[15,22],[15,23],[16,23],[16,24],[16,25],[17,25],[18,25],[18,26],[18,27]],
+  taiwan: [[18,12],[17,12],[16,12],[15,12],[14,12],[13,12],[12,12],[11,12],[10,12],[9,12],[8,12],[7,12],[6,12],[6,13],[5,13],[5,14],[4,14],[4,15],[3,15],[3,16],[2,16],[2,17],[1,17],[1,18],[1,19],[0,19],[0,20],[0,21],[0,22],[0,23],[0,24],[0,25]],
+};
+
+function computePath() {
+  G.path = PATHS[document.getElementById('selMap').value] || [];
+}
+
+// ── HELPERS ───────────────────────────────────────────────────────────────────
+function curMap() { return MAPS[document.getElementById('selMap').value]; }
+function curMask() { return curMap().mask; }
+
+function cellCenter(r, c) { return [(c + 0.5) * CW, (r + 0.5) * CH]; }
+
+function pathPos(t) {
+  const n = G.path.length;
+  if (!n) return [0, 0];
+  const clamped = Math.max(0, Math.min(t, n - 1));
+  const idx = Math.min(Math.floor(clamped), n - 2);
+  const frac = clamped - idx;
+  const [r1, c1] = G.path[idx];
+  const [r2, c2] = G.path[Math.min(idx + 1, n - 1)];
+  const [x1, y1] = cellCenter(r1, c1);
+  const [x2, y2] = cellCenter(r2, c2);
+  return [x1 + (x2 - x1) * frac, y1 + (y2 - y1) * frac];
+}
+
+function rangeInPx(cells) { return cells * (CW + CH) / 2; }
+
+function pixelToCell(px, py) {
+  return [Math.floor(py / CH), Math.floor(px / CW)];
+}
+
+function updateHud() {
+  document.getElementById('hLives').textContent = G.lives;
+  document.getElementById('hLives').className = 'hv ' + (G.lives > 10 ? 'ok' : G.lives > 5 ? '' : 'bad');
+  document.getElementById('hGold').textContent  = '$' + G.gold;
+  document.getElementById('hWave').textContent  = G.wave;
+  document.getElementById('hScore').textContent = G.score;
+  document.getElementById('hKills').textContent = G.kills;
+}
+
+function setStatus(msg) { document.getElementById('status-bar').textContent = msg; }
+
+function updateTicker() {
+  const ticks = curMap().ticker;
+  document.getElementById('ticker').textContent = ticks[tickIdx % ticks.length];
+  tickIdx++;
+}
+
+// ── WAVE GENERATION ───────────────────────────────────────────────────────────
+function buildSpawnQueue(wave) {
+  const q = [];
+  const patrol   = Math.min(4 + wave * 2, 20);
+  const cargo    = wave > 2 ? Math.min((wave - 2) * 2, 14) : 0;
+  const tanker   = wave > 4 ? Math.min(wave - 4, 8) : 0;
+  const destroyer = wave > 6 ? Math.min(wave - 6, 6) : 0;
+
+  for (let i = 0; i < patrol;    i++) q.push('patrol');
+  for (let i = 0; i < cargo;     i++) q.push('cargo');
+  for (let i = 0; i < tanker;    i++) q.push('tanker');
+  for (let i = 0; i < destroyer; i++) q.push('destroyer');
+
+  // Shuffle
+  for (let i = q.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [q[i], q[j]] = [q[j], q[i]];
+  }
+  return q;
+}
+
+function startWave() {
+  if (G.waveActive || G.over) return;
+  G.wave++;
+  G.waveActive = true;
+  G.spawnQueue = buildSpawnQueue(G.wave);
+  G.spawnTimer = 0;
+  G.enemies = G.enemies.filter(e => e.alive && !e.reached);
+
+  const total = G.spawnQueue.length;
+  setStatus(`⚠️ WAVE ${G.wave} — ${total} HOSTILE SHIPS INCOMING!`);
+  document.getElementById('btnWave').disabled = true;
+  updateHud();
+}
+
+// ── GAME LOOP ─────────────────────────────────────────────────────────────────
+function gameLoop(ts) {
+  const dt = Math.min((ts - lastTs) / 1000, 0.1);
+  lastTs = ts;
+
+  tickTimer += dt;
+  if (tickTimer > 4.2) { tickTimer = 0; updateTicker(); }
+
+  if (!G.over) {
+    if (G.nextWaveIn > 0) {
+      G.nextWaveIn -= dt;
+      const secs = Math.ceil(G.nextWaveIn);
+      document.getElementById('btnWave').textContent = `▶ WAVE ${G.wave + 1} IN ${secs}s`;
+      if (G.nextWaveIn <= 0) { G.nextWaveIn = -1; startWave(); }
+    }
+    updateSpawn(dt);
+    updateEnemies(dt);
+    updateTowers(dt);
+    updateProjectiles(dt);
+    checkWaveComplete();
+  }
+
+  draw();
+  rafId = requestAnimationFrame(gameLoop);
+}
+
+function updateSpawn(dt) {
+  if (!G.waveActive || !G.spawnQueue.length) return;
+  G.spawnTimer -= dt;
+  if (G.spawnTimer > 0) return;
+
+  const type = G.spawnQueue.shift();
+  const cfg  = ENEMY_CFG[type];
+  G.enemies.push({
+    id: G.nextId++, type, alive: true, reached: false,
+    t: 0, speed: cfg.spd, hp: cfg.hp, maxHp: cfg.hp, reward: cfg.reward,
+  });
+  const spawnGap = Math.max(0.6, 1.8 - G.wave * 0.08);
+  G.spawnTimer = spawnGap;
+}
+
+function updateEnemies(dt) {
+  for (const e of G.enemies) {
+    if (!e.alive || e.reached) continue;
+    e.t += e.speed * dt;
+    if (e.t >= G.path.length - 1) {
+      e.reached = true;
+      G.lives = Math.max(0, G.lives - 1);
+      updateHud();
+      if (G.lives <= 0) triggerGameOver();
+    }
+  }
+}
+
+function updateTowers(dt) {
+  for (const tw of G.towers) {
+    tw.cd = Math.max(0, tw.cd - dt);
+    if (tw.cd > 0) continue;
+
+    const cfg = TOWER_CFG[tw.type];
+    const [tx, ty] = cellCenter(tw.r, tw.c);
+    const rngPx = rangeInPx(cfg.range);
+
+    // Target farthest enemy within range
+    let best = null, bestT = -1;
+    for (const e of G.enemies) {
+      if (!e.alive || e.reached) continue;
+      const [ex, ey] = pathPos(e.t);
+      if (Math.hypot(ex - tx, ey - ty) <= rngPx && e.t > bestT) {
+        best = e; bestT = e.t;
+      }
+    }
+
+    if (best) {
+      G.projectiles.push({ x: tx, y: ty, target: best, dmg: cfg.dmg, spd: 380, alive: true });
+      tw.cd = 1 / cfg.rate;
+    }
+  }
+}
+
+function updateProjectiles(dt) {
+  for (const p of G.projectiles) {
+    if (!p.alive) continue;
+    if (!p.target.alive) { p.alive = false; continue; }
+
+    const [tx, ty] = pathPos(p.target.t);
+    const dx = tx - p.x, dy = ty - p.y;
+    const dist = Math.hypot(dx, dy);
+
+    if (dist < p.spd * dt + 6) {
+      p.target.hp -= p.dmg;
+      if (p.target.hp <= 0) {
+        p.target.alive = false;
+        G.gold  += p.target.reward;
+        G.score += p.target.reward * 10;
+        G.kills++;
+        updateHud();
+      }
+      p.alive = false;
+    } else {
+      const ratio = (p.spd * dt) / dist;
+      p.x += dx * ratio;
+      p.y += dy * ratio;
+    }
+  }
+  G.projectiles = G.projectiles.filter(p => p.alive);
+}
+
+function checkWaveComplete() {
+  if (!G.waveActive) return;
+  if (G.spawnQueue.length) return;
+  if (G.enemies.some(e => e.alive && !e.reached)) return;
+
+  G.waveActive = false;
+  G.enemies = [];
+  const bonus = 50 + G.wave * 15;
+  G.gold += bonus;
+  G.score += bonus * 5;
+  updateHud();
+  setStatus(`✅ WAVE ${G.wave} CLEARED — +$${bonus} BONUS · NEXT WAVE IN 15s`);
+  G.nextWaveIn = 15;
+  document.getElementById('btnWave').disabled = false;
+}
+
+function triggerGameOver() {
+  G.over = true;
+  const msgs = [
+    "The strait has fallen. Hostile ships flood through freely.",
+    "Your defenses are overrun. The chokepoint is lost.",
+    "Command lost contact with all shore batteries.",
+    "Oil tankers are turning back — the passage is compromised.",
+  ];
+  showOverlay('lose', '⚠️ STRAIT LOST',
+    msgs[Math.floor(Math.random() * msgs.length)],
+    `Waves survived: ${G.wave} · Ships destroyed: ${G.kills} · Final score: ${G.score}`
+  );
+}
+
+// ── RENDERING ─────────────────────────────────────────────────────────────────
+function draw() {
+  ctx.clearRect(0, 0, MW, MH);
+  const mask = curMask();
+
+  // Land cell overlay
+  ctx.fillStyle = 'rgba(160,130,90,0.32)';
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      if (mask[r][c]) ctx.fillRect(c * CW, r * CH, CW, CH);
+    }
+  }
+
+  // Path highlight
+  ctx.fillStyle = 'rgba(30,120,255,0.07)';
+  for (const [r, c] of G.path) ctx.fillRect(c * CW, r * CH, CW, CH);
+
+  // Entry marker (green)
+  if (G.path.length) {
+    const [er, ec] = G.path[0];
+    ctx.fillStyle = 'rgba(20,180,20,0.45)';
+    ctx.fillRect(ec * CW, er * CH, CW, CH);
+    ctx.fillStyle = '#0c0';
+    ctx.font = 'bold 10px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('IN', (ec + 0.5) * CW, (er + 0.5) * CH);
+
+    // Exit marker (red)
+    const [xr, xc] = G.path[G.path.length - 1];
+    ctx.fillStyle = 'rgba(220,30,30,0.45)';
+    ctx.fillRect(xc * CW, xr * CH, CW, CH);
+    ctx.fillStyle = '#f00';
+    ctx.fillText('OUT', (xc + 0.5) * CW, (xr + 0.5) * CH);
+  }
+
+  // Tower range preview while placing
+  if (G.placing && G.hoverCell) {
+    const [hr, hc] = G.hoverCell;
+    const canPlace = mask[hr][hc] && !G.towers.some(t => t.r === hr && t.c === hc);
+    ctx.fillStyle = canPlace ? 'rgba(0,200,0,0.28)' : 'rgba(200,0,0,0.28)';
+    ctx.fillRect(hc * CW, hr * CH, CW, CH);
+    if (canPlace) {
+      const [tx, ty] = cellCenter(hr, hc);
+      ctx.strokeStyle = 'rgba(0,100,220,0.35)';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.arc(tx, ty, rangeInPx(TOWER_CFG[G.placing].range), 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+
+  // Towers
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  for (const tw of G.towers) {
+    const [tx, ty] = cellCenter(tw.r, tw.c);
+    const cfg = TOWER_CFG[tw.type];
+
+    // Shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.25)';
+    ctx.beginPath();
+    ctx.arc(tx + 1, ty + 2, 9, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Body
+    ctx.fillStyle = cfg.col;
+    ctx.beginPath();
+    ctx.arc(tx, ty, 9, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Emoji
+    ctx.font = '11px serif';
+    ctx.fillText(cfg.emoji, tx, ty);
+  }
+
+  // Enemies
+  for (const e of G.enemies) {
+    if (!e.alive || e.reached) continue;
+    const [ex, ey] = pathPos(e.t);
+    const cfg = ENEMY_CFG[e.type];
+
+    // HP bar background
+    const bw = 22;
+    ctx.fillStyle = 'rgba(60,0,0,0.7)';
+    ctx.fillRect(ex - bw / 2, ey - 13, bw, 3);
+
+    // HP bar fill
+    const pct = e.hp / e.maxHp;
+    ctx.fillStyle = pct > 0.6 ? '#0c0' : pct > 0.3 ? '#ca0' : '#c00';
+    ctx.fillRect(ex - bw / 2, ey - 13, bw * pct, 3);
+
+    // Emoji
+    ctx.font = '15px serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(cfg.emoji, ex, ey);
+  }
+
+  // Projectiles
+  for (const p of G.projectiles) {
+    ctx.fillStyle = '#ffe050';
+    ctx.shadowColor = '#ff8800';
+    ctx.shadowBlur = 4;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+
+  // Game over dim overlay
+  if (G.over) {
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.fillRect(0, 0, MW, MH);
+  }
+}
+
+// ── OVERLAY ───────────────────────────────────────────────────────────────────
+function showOverlay(type, title, body, stat) {
+  const ov = document.getElementById('ov');
+  const mb = document.getElementById('msgbox');
+  mb.className = 'mb ' + type;
+  document.getElementById('msgTitle').textContent = title;
+  document.getElementById('msgBody').textContent  = body;
+  document.getElementById('msgStat').textContent  = stat || '';
+  ov.classList.add('show');
+}
+
+// ── INPUT ─────────────────────────────────────────────────────────────────────
+canvas.addEventListener('mousemove', e => {
+  const [r, c] = pixelToCell(e.offsetX, e.offsetY);
+  G.hoverCell = (r >= 0 && r < ROWS && c >= 0 && c < COLS) ? [r, c] : null;
+});
+
+canvas.addEventListener('mouseleave', () => { G.hoverCell = null; });
+
+canvas.addEventListener('click', e => {
+  if (G.over) return;
+  const [r, c] = pixelToCell(e.offsetX, e.offsetY);
+  if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return;
+
+  if (!G.placing) return;
+
+  const mask = curMask();
+  if (!mask[r][c]) { setStatus('⚠️ TOWERS MUST BE BUILT ON LAND — click brown/elevated terrain'); return; }
+  if (G.towers.some(t => t.r === r && t.c === c)) { setStatus('⚠️ POSITION OCCUPIED — choose another cell'); return; }
+
+  const cfg = TOWER_CFG[G.placing];
+  if (G.gold < cfg.cost) { setStatus(`⚠️ INSUFFICIENT FUNDS — need $${cfg.cost}, have $${G.gold}`); return; }
+
+  G.gold -= cfg.cost;
+  G.towers.push({ r, c, type: G.placing, cd: 0 });
+  updateHud();
+  setStatus(`✅ ${cfg.label} placed — $${cfg.sell} to sell (right-click)`);
+  // Keep placement mode active for rapid building
+});
+
+canvas.addEventListener('contextmenu', e => {
+  e.preventDefault();
+  if (G.over) return;
+  const [r, c] = pixelToCell(e.offsetX, e.offsetY);
+  const idx = G.towers.findIndex(t => t.r === r && t.c === c);
+  if (idx < 0) { cancelPlacing(); return; }
+  const tw = G.towers[idx];
+  const sell = TOWER_CFG[tw.type].sell;
+  G.towers.splice(idx, 1);
+  G.gold += sell;
+  updateHud();
+  setStatus(`💰 Tower sold for $${sell}`);
+});
+
+function cancelPlacing() {
+  G.placing = null;
+  document.querySelectorAll('.tb[data-type]').forEach(b => b.classList.remove('sel'));
+  document.getElementById('tb-cancel').style.display = 'none';
+  setStatus('RIGHT-CLICK A TOWER TO SELL FOR 50% · BUILD ON LAND (BROWN) · ENEMIES TRAVEL THROUGH WATER');
+}
+
+document.querySelectorAll('.tb[data-type]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const type = btn.dataset.type;
+    if (G.placing === type) { cancelPlacing(); return; }
+    G.placing = type;
+    document.querySelectorAll('.tb[data-type]').forEach(b => b.classList.remove('sel'));
+    btn.classList.add('sel');
+    document.getElementById('tb-cancel').style.display = '';
+    const cfg = TOWER_CFG[type];
+    setStatus(`🔧 PLACING ${cfg.label} ($${cfg.cost}) — click on land to build, right-click to cancel`);
+  });
+});
+
+document.getElementById('tb-cancel').addEventListener('click', cancelPlacing);
+
+document.getElementById('btnWave').addEventListener('click', () => {
+  if (!G.path.length) { setStatus('⚠️ NO VALID PATH FOUND FOR THIS MAP'); return; }
+  G.nextWaveIn = -1;  // cancel countdown if player clicks early
+  startWave();
+});
+
+document.getElementById('btnNew').addEventListener('click', () => {
+  cancelPlacing();
+  initGame();
+});
+
+document.getElementById('selMap').addEventListener('change', () => {
+  cancelPlacing();
+  initMap();
+  initGame();
+});
+
+document.getElementById('btnOk').addEventListener('click', () => {
+  document.getElementById('ov').classList.remove('show');
+  if (G.over) { initGame(); }
+});
+
+// ── LEAFLET MAP ───────────────────────────────────────────────────────────────
+function initMap() {
+  const m = curMap();
+  document.getElementById('mapSub').textContent = m.subtitle;
+
+  if (leafMap) {
+    leafMap.setView(m.center, m.zoom || 8);
+    return;
+  }
+
+  leafMap = L.map('map', {
+    center: m.center,
+    zoom: m.zoom || 8,
+    zoomControl: false,
+    dragging: false,
+    touchZoom: false,
+    scrollWheelZoom: false,
+    doubleClickZoom: false,
+    boxZoom: false,
+    keyboard: false,
+    attributionControl: true,
+  });
+
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> · <a href="https://carto.com/">CARTO</a>',
+    subdomains: 'abcd',
+    maxZoom: 20,
+  }).addTo(leafMap);
+}
+
+// ── TICKER ─────────────────────────────────────────────────────────────────────
+setInterval(updateTicker, 4200);
+
+// ── BOOT ─────────────────────────────────────────────────────────────────────
+initMap();
+initGame();
+lastTs = performance.now();
+rafId = requestAnimationFrame(gameLoop);
+
+</script>
+</body>
+</html>
