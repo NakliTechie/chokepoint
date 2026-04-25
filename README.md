@@ -111,6 +111,12 @@ Each map uses a real-world satellite basemap (Leaflet + CartoDB Voyager tiles) w
 - Vanilla JavaScript — no frameworks, no build step
 - Canvas 2D — game rendering overlay
 
+## Palette
+
+Coloured with **`scandinavia-01 · SNÖ`** — first snowfall, frozen lake. Matches its sibling [Strait Command](https://github.com/NakliTechie/strait-command) (same maps, different genre): frosty body, deep-teal command towers, brick-red hostile fleet.
+
+Palette pulled from [**Rangrez**](https://github.com/NakliTechie/rangrez), the global colour-palette library that backs all NakliTechie projects.
+
 ---
 
 ## Part of the NakliTechie series

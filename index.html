@@ -6,41 +6,47 @@
 <title>⚓ CHOKEPOINT</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <style>
+/* Rangrez · scandinavia-01 · SNÖ — first snowfall, frozen lake (matches strait-command) */
+:root{
+  --body:#f6f8f8; --panel:#ffffff; --ink:#0f1420;
+  --brand:#9c3a28; --act:#1a5a6a; --act-deep:#114048; --ok:#2a5a3a; --ok-deep:#1a3a18;
+  --row:#eaecec; --line:#b8c8d0; --ink-soft:#5a6a78;
+}
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:#dce8f0;color:#1a2a3a;font-family:'Courier New',monospace;display:flex;flex-direction:column;align-items:center;padding:12px;min-height:100vh}
-h1{color:#0d3b6e;font-size:1.55rem;letter-spacing:4px;margin-bottom:3px}
-.sub{font-size:.68rem;color:#5a7a9a;letter-spacing:2px;margin-bottom:10px}
-#hud{display:flex;gap:20px;background:#fff;border:2px solid #b0c8dc;padding:8px 20px;margin-bottom:8px;align-items:center;box-shadow:0 2px 6px rgba(0,50,100,.1);flex-wrap:wrap}
+body{background:var(--body);color:var(--ink);font-family:'Courier New',monospace;display:flex;flex-direction:column;align-items:center;padding:12px;min-height:100vh}
+h1{color:var(--act);font-size:1.55rem;letter-spacing:4px;margin-bottom:3px}
+.sub{font-size:.68rem;color:var(--ink-soft);letter-spacing:2px;margin-bottom:10px}
+#hud{display:flex;gap:20px;background:var(--panel);border:2px solid var(--line);padding:8px 20px;margin-bottom:8px;align-items:center;box-shadow:0 2px 6px rgba(15,20,32,.08);flex-wrap:wrap}
 .hb{text-align:center}
-.hl{font-size:.58rem;color:#7a9ab0;letter-spacing:1px;display:block;text-transform:uppercase}
-.hv{font-size:1.25rem;color:#0d3b6e;font-weight:bold;min-width:58px;display:block}
-.hv.ok{color:#1a7a1a}.hv.bad{color:#c0200a}
+.hl{font-size:.58rem;color:var(--ink-soft);letter-spacing:1px;display:block;text-transform:uppercase}
+.hv{font-size:1.25rem;color:var(--act);font-weight:bold;min-width:58px;display:block}
+.hv.ok{color:var(--ok)}.hv.bad{color:var(--brand)}
 #ctrl-map{display:flex;gap:6px;margin-bottom:5px;align-items:center;max-width:880px}
 #ctrl-build{display:flex;gap:6px;margin-bottom:8px;align-items:center;flex-wrap:wrap;max-width:880px}
-.tb{background:#fff;border:2px solid #b0c8dc;color:#0d3b6e;padding:4px 9px;font-family:'Courier New',monospace;font-size:.7rem;cursor:pointer;letter-spacing:1px;transition:all .15s;text-align:left;line-height:1.4}
-.tb:hover{background:#e0edf7;border-color:#0d3b6e}
-.tb.sel{background:#0d3b6e;color:#fff;border-color:#0a2d56}
-.tb small{font-size:.55rem;color:#7a9ab0;display:block}.tb.sel small{color:#88b0d0}
-.sep{color:#b0c8dc;font-size:.8rem;padding:0 2px}
-select,button{background:#fff;border:2px solid #b0c8dc;color:#0d3b6e;padding:5px 10px;font-family:'Courier New',monospace;font-size:.72rem;cursor:pointer;letter-spacing:1px;transition:all .15s}
-button:hover{background:#e0edf7;border-color:#0d3b6e}
+.tb{background:var(--panel);border:2px solid var(--line);color:var(--act);padding:4px 9px;font-family:'Courier New',monospace;font-size:.7rem;cursor:pointer;letter-spacing:1px;transition:all .15s;text-align:left;line-height:1.4}
+.tb:hover{background:var(--row);border-color:var(--act)}
+.tb.sel{background:var(--act);color:var(--panel);border-color:var(--act-deep)}
+.tb small{font-size:.55rem;color:var(--ink-soft);display:block}.tb.sel small{color:#a8c8d2}
+.sep{color:var(--line);font-size:.8rem;padding:0 2px}
+select,button{background:var(--panel);border:2px solid var(--line);color:var(--act);padding:5px 10px;font-family:'Courier New',monospace;font-size:.72rem;cursor:pointer;letter-spacing:1px;transition:all .15s}
+button:hover{background:var(--row);border-color:var(--act)}
 button:disabled{opacity:.45;cursor:default}
-#btnWave{background:#1a7a1a;border-color:#155a15;color:#fff}
-#btnWave:hover:not(:disabled){background:#155a15}
+#btnWave{background:var(--ok);border-color:var(--ok-deep);color:var(--panel)}
+#btnWave:hover:not(:disabled){background:var(--ok-deep)}
 #btnWave:disabled{background:#888;border-color:#666}
-#wrap{position:relative;border:3px solid #0d3b6e;box-shadow:0 4px 18px rgba(0,50,100,.25)}
+#wrap{position:relative;border:3px solid var(--act);box-shadow:0 4px 18px rgba(15,20,32,.22)}
 #map{width:860px;height:460px}
 #gc{position:absolute;top:0;left:0;width:860px;height:460px;cursor:crosshair;z-index:1000}
-#ov{position:absolute;top:0;left:0;right:0;bottom:0;display:none;align-items:center;justify-content:center;background:rgba(240,248,255,.94);z-index:2000}
+#ov{position:absolute;top:0;left:0;right:0;bottom:0;display:none;align-items:center;justify-content:center;background:rgba(246,248,248,.94);z-index:2000}
 #ov.show{display:flex}
-.mb{background:#fff;padding:28px 38px;text-align:center;max-width:440px;border:2px solid #b0c8dc;box-shadow:0 4px 16px rgba(0,50,100,.15)}
-.mb.win{border-color:#1a7a1a}.mb.lose{border-color:#c0200a}
-.mb h2{font-size:1.2rem;margin-bottom:10px;letter-spacing:2px;color:#0d3b6e}
-.mb.win h2{color:#1a7a1a}.mb.lose h2{color:#c0200a}
-.mb p{color:#4a6a80;font-size:.78rem;margin-bottom:6px;line-height:1.6}
-.mb .stat{color:#0d3b6e;font-size:.85rem;font-weight:bold;margin:10px 0 4px}
-#ticker{margin-top:8px;font-size:.62rem;color:#6a8a9a;letter-spacing:1px;max-width:860px;height:1.2em;overflow:hidden}
-#status-bar{font-size:.65rem;color:#5a7a9a;letter-spacing:1px;margin-bottom:4px;height:1em}
+.mb{background:var(--panel);padding:28px 38px;text-align:center;max-width:440px;border:2px solid var(--line);box-shadow:0 4px 16px rgba(15,20,32,.15)}
+.mb.win{border-color:var(--ok)}.mb.lose{border-color:var(--brand)}
+.mb h2{font-size:1.2rem;margin-bottom:10px;letter-spacing:2px;color:var(--act)}
+.mb.win h2{color:var(--ok)}.mb.lose h2{color:var(--brand)}
+.mb p{color:var(--ink-soft);font-size:.78rem;margin-bottom:6px;line-height:1.6}
+.mb .stat{color:var(--act);font-size:.85rem;font-weight:bold;margin:10px 0 4px}
+#ticker{margin-top:8px;font-size:.62rem;color:var(--ink-soft);letter-spacing:1px;max-width:860px;height:1.2em;overflow:hidden}
+#status-bar{font-size:.65rem;color:var(--ink-soft);letter-spacing:1px;margin-bottom:4px;height:1em}
 .leaflet-control-attribution{font-size:9px!important}
 </style>
 </head>
@@ -254,16 +260,16 @@ const MW = 860, MH = 460, COLS = 35, ROWS = 19;
 const CW = MW / COLS, CH = MH / ROWS;
 
 const TOWER_CFG = {
-  watch:   { cost:50,  sell:25,  range:3, dmg:8,  rate:1.5, col:'#1a5ab0', emoji:'🛡️', label:'WATCH POST'  },
-  gun:     { cost:150, sell:75,  range:5, dmg:25, rate:0.8, col:'#0d3b6e', emoji:'⚓',  label:'NAVAL GUN'   },
-  missile: { cost:300, sell:150, range:7, dmg:80, rate:0.3, col:'#1a2a4a', emoji:'🚀', label:'MISSILE BATT' },
+  watch:   { cost:50,  sell:25,  range:3, dmg:8,  rate:1.5, col:'#3a8a9a', emoji:'🛡️', label:'WATCH POST'  },
+  gun:     { cost:150, sell:75,  range:5, dmg:25, rate:0.8, col:'#1a5a6a', emoji:'⚓',  label:'NAVAL GUN'   },
+  missile: { cost:300, sell:150, range:7, dmg:80, rate:0.3, col:'#0f1420', emoji:'🚀', label:'MISSILE BATT' },
 };
 
 const ENEMY_CFG = {
-  patrol:  { hp:50,  spd:1.8, reward:10, col:'#2a8a2a', emoji:'🚤', label:'PATROL BOAT' },
-  cargo:   { hp:150, spd:1.1, reward:18, col:'#2a5a8a', emoji:'🚢', label:'CARGO SHIP'  },
-  tanker:  { hp:400, spd:0.6, reward:30, col:'#8a5a2a', emoji:'🛢️', label:'TANKER'       },
-  destroyer:{ hp:250, spd:1.6, reward:25, col:'#aa2222', emoji:'⚔️', label:'DESTROYER'  },
+  patrol:  { hp:50,  spd:1.8, reward:10, col:'#9c3a28', emoji:'🚤', label:'PATROL BOAT' },
+  cargo:   { hp:150, spd:1.1, reward:18, col:'#b85838', emoji:'🚢', label:'CARGO SHIP'  },
+  tanker:  { hp:400, spd:0.6, reward:30, col:'#8a4818', emoji:'🛢️', label:'TANKER'       },
+  destroyer:{ hp:250, spd:1.6, reward:25, col:'#7a1810', emoji:'⚔️', label:'DESTROYER'  },
 };
 
 // ── GAME STATE ────────────────────────────────────────────────────────────────
@@ -624,7 +630,7 @@ function draw() {
     const [er, ec] = G.path[0];
     ctx.fillStyle = 'rgba(20,180,20,0.45)';
     ctx.fillRect(ec * CW, er * CH, CW, CH);
-    ctx.fillStyle = '#0c0';
+    ctx.fillStyle = '#2a5a3a';
     ctx.font = 'bold 10px monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -634,7 +640,7 @@ function draw() {
     const [xr, xc] = G.path[G.path.length - 1];
     ctx.fillStyle = 'rgba(220,30,30,0.45)';
     ctx.fillRect(xc * CW, xr * CH, CW, CH);
-    ctx.fillStyle = '#f00';
+    ctx.fillStyle = '#9c3a28';
     ctx.fillText('OUT', (xc + 0.5) * CW, (xr + 0.5) * CH);
   }
 
@@ -693,7 +699,7 @@ function draw() {
 
     // HP bar fill
     const pct = e.hp / e.maxHp;
-    ctx.fillStyle = pct > 0.6 ? '#0c0' : pct > 0.3 ? '#ca0' : '#c00';
+    ctx.fillStyle = pct > 0.6 ? '#2a5a3a' : pct > 0.3 ? '#c08018' : '#9c3a28';
     ctx.fillRect(ex - bw / 2, ey - 13, bw * pct, 3);
 
     // Emoji
@@ -705,8 +711,8 @@ function draw() {
 
   // Projectiles
   for (const p of G.projectiles) {
-    ctx.fillStyle = '#ffe050';
-    ctx.shadowColor = '#ff8800';
+    ctx.fillStyle = '#f0c870';
+    ctx.shadowColor = '#c08018';
     ctx.shadowBlur = 4;
     ctx.beginPath();
     ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
@@ -859,5 +865,5 @@ lastTs = performance.now();
 rafId = requestAnimationFrame(gameLoop);
 
 </script>
-<div style="position:fixed;bottom:12px;left:50%;transform:translateX(-50%);display:flex;gap:16px;align-items:center;font-family:system-ui,-apple-system,sans-serif;font-size:12px;color:#667;background:rgba(255,255,255,0.9);padding:8px 16px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.1);z-index:10000"><a href="https://naklitechie.github.io/" style="color:#0366d6;text-decoration:none;font-weight:500" target="_blank" rel="noopener">⬅ More Projects</a><span style="color:#e1e4e8">|</span><a href="https://github.com/NakliTechie/chokepoint" style="color:#0366d6;text-decoration:none;font-weight:500" target="_blank" rel="noopener">⌨ Source</a></div></body>
+<div style="position:fixed;bottom:12px;left:50%;transform:translateX(-50%);display:flex;gap:16px;align-items:center;font-family:system-ui,-apple-system,sans-serif;font-size:12px;color:var(--ink-soft);background:rgba(246,248,248,0.9);padding:8px 16px;border-radius:8px;box-shadow:0 2px 8px rgba(15,20,32,0.1);z-index:10000"><a href="https://naklitechie.github.io/" style="color:var(--act);text-decoration:none;font-weight:500" target="_blank" rel="noopener">⬅ More Projects</a><span style="color:var(--line)">|</span><a href="https://github.com/NakliTechie/chokepoint" style="color:var(--act);text-decoration:none;font-weight:500" target="_blank" rel="noopener">⌨ Source</a></div></body>
 </html>
